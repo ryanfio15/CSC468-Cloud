@@ -3,6 +3,11 @@
  
 ## Vision
  
+The goal of this project is to create a web service with a user database that allows for 
+ai powered code reviews. The reviews are powered by anthropics most current models and can
+be fine tuned to allow for specific criteria. This service contains a secure user system, 
+and allows for repositorys to be stored and reviewed at any time.
+
 The system is split into two containerized services that communicate over REST (HTTP/JSON):
  
 ```
