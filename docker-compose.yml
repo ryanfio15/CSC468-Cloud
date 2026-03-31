@@ -9,22 +9,43 @@ services:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       retries: 5
+    networks:
+      - db-net
 
   backend:
     image: ghcr.io/ryanfio15/ai-code-review-system-backend:latest
-    ports:
-      - "8000:8000"
     env_file: .env
     depends_on:
       db:
         condition: service_healthy
-        
+    networks:
+      - db-net
+      - app-net
+
   frontend:
     image: ghcr.io/ryanfio15/ai-code-review-system-frontend:latest
-    ports:
-      - "80:80"
     depends_on:
       - backend
+    networks:
+      - app-net
+
+  proxy:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+    networks:
+      - app-net
+
+networks:
+  db-net:
+    driver: bridge
+    internal: true
+  app-net:
+    driver: bridge
 
 volumes:
   pgdata:
