@@ -12,10 +12,9 @@ done
 POSTGRES_USER="user_$(openssl rand -hex 4)"
 POSTGRES_PASSWORD="$(openssl rand -hex 16)"
 POSTGRES_DB="db_$(openssl rand -hex 4)"
-
-# Write .env file for backend and db containers
 SECRET_KEY="$(openssl rand -hex 32)"
 
+# Write .env file for backend and db containers
 cat > /local/repository/.env <<EOF
 POSTGRES_USER=${POSTGRES_USER}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -40,3 +39,53 @@ echo "All containers are up."
 
 # Register custom hostname so the node resolves RyanFioravantiCSC468Project to itself
 echo "127.0.0.1 RyanFioravantiCSC468Project" | sudo tee -a /etc/hosts
+
+# ── GitHub Actions self-hosted runner setup ──────────────────────────────────
+
+RUNNER_DIR="/opt/actions-runner"
+REPO="ryanfio15/ai-code-review-system"
+
+# Remove any stale runners registered with GitHub from previous experiments
+echo "Removing stale runners from GitHub..."
+RUNNER_IDS=$(curl -s \
+  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/${REPO}/actions/runners" \
+  | grep '"id"' | awk -F: '{print $2}' | tr -d ', ')
+
+for ID in $RUNNER_IDS; do
+  curl -s -X DELETE \
+    -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/${REPO}/actions/runners/${ID}"
+  echo "Removed stale runner ID: ${ID}"
+done
+
+# Download and install the runner agent
+mkdir -p ${RUNNER_DIR}
+cd ${RUNNER_DIR}
+
+RUNNER_VERSION="2.323.0"
+curl -sL "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz" \
+  | tar xz
+
+# Get a fresh registration token via the GitHub API
+REG_TOKEN=$(curl -s -X POST \
+  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/${REPO}/actions/runners/registration-token" \
+  | grep '"token"' | awk -F'"' '{print $4}')
+
+# Configure and register the runner
+sudo -u root ./config.sh \
+  --url "https://github.com/${REPO}" \
+  --token "${REG_TOKEN}" \
+  --name "cloudlab-node" \
+  --labels "cloudlab" \
+  --unattended \
+  --replace
+
+# Start the runner as a background service
+nohup ./run.sh &>/var/log/actions-runner.log &
+
+echo "GitHub Actions runner registered and started."
