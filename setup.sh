@@ -14,13 +14,16 @@ POSTGRES_PASSWORD="$(openssl rand -hex 16)"
 POSTGRES_DB="db_$(openssl rand -hex 4)"
 
 # Write .env file for backend and db containers
+SECRET_KEY="$(openssl rand -hex 32)"
+
 cat > /local/repository/.env <<EOF
 POSTGRES_USER=${POSTGRES_USER}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 POSTGRES_DB=${POSTGRES_DB}
 DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-API_KEY=${API_KEY}
+ANTHROPIC_API_KEY=${API_KEY}
 GITHUB_TOKEN=${GITHUB_TOKEN}
+SECRET_KEY=${SECRET_KEY}
 EOF
 
 echo ".env file written."
