@@ -8,6 +8,11 @@ until sudo docker info >/dev/null 2>&1; do
     sleep 3
 done
 
+# Detect the CloudLab user (owns /local/repository)
+RUNNER_USER=$(stat -c '%U' /local/repository)
+RUNNER_HOME=$(getent passwd ${RUNNER_USER} | cut -d: -f6)
+echo "Detected CloudLab user: ${RUNNER_USER}"
+
 # Generate random Postgres credentials for this launch
 POSTGRES_USER="user_$(openssl rand -hex 4)"
 POSTGRES_PASSWORD="$(openssl rand -hex 16)"
@@ -27,10 +32,10 @@ EOF
 
 echo ".env file written."
 
-# Login to GHCR using the GitHub token
-echo "${GITHUB_TOKEN}" | sudo docker login ghcr.io -u ryanfio15 --password-stdin
+# Login to GHCR as the runner user so deploy jobs can pull images
+echo "${GITHUB_TOKEN}" | sudo -u ${RUNNER_USER} docker login ghcr.io -u ryanfio15 --password-stdin
 
-# Pull images and bring up all containers (db, backend, frontend)
+# Pull images and bring up all containers
 cd /local/repository
 sudo docker-compose pull
 sudo docker-compose up -d
@@ -63,11 +68,14 @@ done
 
 # Download and install the runner agent
 mkdir -p ${RUNNER_DIR}
+chown ${RUNNER_USER} ${RUNNER_DIR}
 cd ${RUNNER_DIR}
 
 RUNNER_VERSION="2.323.0"
 curl -sL "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz" \
   | tar xz
+
+chown -R ${RUNNER_USER} ${RUNNER_DIR}
 
 # Get a fresh registration token via the GitHub API
 REG_TOKEN=$(curl -s -X POST \
@@ -76,8 +84,8 @@ REG_TOKEN=$(curl -s -X POST \
   "https://api.github.com/repos/${REPO}/actions/runners/registration-token" \
   | grep '"token"' | awk -F'"' '{print $4}')
 
-# Configure and register the runner
-sudo -u root ./config.sh \
+# Configure and register the runner as the CloudLab user
+sudo -u ${RUNNER_USER} ./config.sh \
   --url "https://github.com/${REPO}" \
   --token "${REG_TOKEN}" \
   --name "cloudlab-node" \
@@ -85,7 +93,7 @@ sudo -u root ./config.sh \
   --unattended \
   --replace
 
-# Start the runner as a background service
-nohup ./run.sh &>/var/log/actions-runner.log &
+# Start the runner as a background service under the CloudLab user
+sudo -u ${RUNNER_USER} nohup ./run.sh &>/var/log/actions-runner.log &
 
-echo "GitHub Actions runner registered and started."
+echo "GitHub Actions runner registered and started as ${RUNNER_USER}."
