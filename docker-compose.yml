@@ -40,6 +40,17 @@ services:
     networks:
       - app-net
 
+  watchtower:
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/config.json
+    environment:
+      - WATCHTOWER_POLL_INTERVAL=30
+      - WATCHTOWER_CLEANUP=true
+    networks:
+      - app-net
+
 networks:
   db-net:
     driver: bridge
