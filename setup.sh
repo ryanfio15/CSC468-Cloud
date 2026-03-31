@@ -37,7 +37,7 @@ echo "${GITHUB_TOKEN}" | sudo -u ${RUNNER_USER} docker login ghcr.io -u ryanfio1
 
 # Pull images and bring up all containers
 cd /local/repository
-sudo docker-compose pull
+sudo docker-compose pull || true
 sudo docker-compose up -d
 
 echo "All containers are up."
